@@ -109,6 +109,7 @@
         <module>plugin/trino-session-property-managers</module>
         <module>plugin/trino-singlestore</module>
         <module>plugin/trino-snowflake</module>
+        <module>plugin/trino-spooling-filesystem</module>
         <module>plugin/trino-sqlserver</module>
         <module>plugin/trino-teradata-functions</module>
         <module>plugin/trino-thrift</module>
@@ -1193,6 +1194,13 @@
 
             <dependency>
                 <groupId>io.trino</groupId>
+                <artifactId>trino-jdbc</artifactId>
+                <version>${project.version}</version>
+                <classifier>nonshaded</classifier>
+            </dependency>
+
+            <dependency>
+                <groupId>io.trino</groupId>
                 <artifactId>trino-jmx</artifactId>
                 <version>${project.version}</version>
             </dependency>
@@ -1440,6 +1448,12 @@
                 <artifactId>trino-spi</artifactId>
                 <version>${project.version}</version>
                 <type>test-jar</type>
+            </dependency>
+
+            <dependency>
+                <groupId>io.trino</groupId>
+                <artifactId>trino-spooling-filesystem</artifactId>
+                <version>${project.version}</version>
             </dependency>
 
             <dependency>

@@ -71,6 +71,8 @@ public final class SessionRepresentation
     private final Map<String, SelectedRole> catalogRoles;
     private final Map<String, String> preparedStatements;
     private final String protocolName;
+    private final Optional<String> queryDataEncoding;
+    private final Optional<Slice> queryDataEncryptionKey;
 
     @JsonCreator
     public SessionRepresentation(
@@ -102,7 +104,9 @@ public final class SessionRepresentation
             @JsonProperty("catalogProperties") Map<String, Map<String, String>> catalogProperties,
             @JsonProperty("catalogRoles") Map<String, SelectedRole> catalogRoles,
             @JsonProperty("preparedStatements") Map<String, String> preparedStatements,
-            @JsonProperty("protocolName") String protocolName)
+            @JsonProperty("protocolName") String protocolName,
+            @JsonProperty("queryDataEncoding") Optional<String> queryDataEncoding,
+            @JsonProperty("queryDataEncryptionKey") Optional<Slice> queryDataEncryptionKey)
     {
         this.queryId = requireNonNull(queryId, "queryId is null");
         this.querySpan = requireNonNull(querySpan, "querySpan is null");
@@ -132,6 +136,8 @@ public final class SessionRepresentation
         this.catalogRoles = ImmutableMap.copyOf(catalogRoles);
         this.preparedStatements = ImmutableMap.copyOf(preparedStatements);
         this.protocolName = requireNonNull(protocolName, "protocolName is null");
+        this.queryDataEncoding = requireNonNull(queryDataEncoding, "queryDataEncoding is null");
+        this.queryDataEncryptionKey = requireNonNull(queryDataEncryptionKey, "queryDataEncryptionKey is null");
 
         ImmutableMap.Builder<String, Map<String, String>> catalogPropertiesBuilder = ImmutableMap.builder();
         for (Entry<String, Map<String, String>> entry : catalogProperties.entrySet()) {
@@ -320,6 +326,18 @@ public final class SessionRepresentation
         return timeZoneKey.getId();
     }
 
+    @JsonProperty
+    public Optional<String> getQueryDataEncoding()
+    {
+        return queryDataEncoding;
+    }
+
+    @JsonProperty
+    public Optional<Slice> getQueryDataEncryptionKey()
+    {
+        return queryDataEncryptionKey;
+    }
+
     public Identity toIdentity()
     {
         return toIdentity(emptyMap());
@@ -378,6 +396,8 @@ public final class SessionRepresentation
                 sessionPropertyManager,
                 preparedStatements,
                 createProtocolHeaders(protocolName),
-                exchangeEncryptionKey);
+                exchangeEncryptionKey,
+                queryDataEncoding,
+                queryDataEncryptionKey);
     }
 }

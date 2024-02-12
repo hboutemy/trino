@@ -20,6 +20,7 @@ import io.trino.Session;
 import io.trino.metadata.Metadata;
 import io.trino.metadata.SessionPropertyManager;
 import io.trino.security.AccessControl;
+import io.trino.server.protocol.spooling.SpoolingConfig;
 import io.trino.spi.QueryId;
 import io.trino.spi.security.Identity;
 import io.trino.spi.type.TimeZoneKey;
@@ -35,6 +36,8 @@ import static io.trino.Session.SessionBuilder;
 import static io.trino.SystemSessionProperties.TIME_ZONE_ID;
 import static io.trino.server.HttpRequestSessionContextFactory.addEnabledRoles;
 import static io.trino.spi.type.TimeZoneKey.getTimeZoneKey;
+import static io.trino.util.Ciphers.createRandomAesEncryptionKey;
+import static io.trino.util.Ciphers.serializeAesEncryptionKey;
 import static java.util.Map.Entry;
 import static java.util.Objects.requireNonNull;
 
@@ -49,13 +52,15 @@ public class QuerySessionSupplier
     private final Optional<TimeZoneKey> forcedSessionTimeZone;
     private final Optional<String> defaultCatalog;
     private final Optional<String> defaultSchema;
+    private final boolean spoolingEncryptionEnabled;
 
     @Inject
     public QuerySessionSupplier(
             Metadata metadata,
             AccessControl accessControl,
             SessionPropertyManager sessionPropertyManager,
-            SqlEnvironmentConfig config)
+            SqlEnvironmentConfig config,
+            SpoolingConfig spoolingConfig)
     {
         this.metadata = requireNonNull(metadata, "metadata is null");
         this.accessControl = requireNonNull(accessControl, "accessControl is null");
@@ -64,6 +69,7 @@ public class QuerySessionSupplier
         this.forcedSessionTimeZone = requireNonNull(config.getForcedSessionTimeZone(), "forcedSessionTimeZone is null");
         this.defaultCatalog = requireNonNull(config.getDefaultCatalog(), "defaultCatalog is null");
         this.defaultSchema = requireNonNull(config.getDefaultSchema(), "defaultSchema is null");
+        this.spoolingEncryptionEnabled = requireNonNull(spoolingConfig, "spoolingConfig is null").isEncryptionEnabled();
 
         checkArgument(defaultCatalog.isPresent() || defaultSchema.isEmpty(), "Default schema cannot be set if catalog is not set");
     }
@@ -112,7 +118,12 @@ public class QuerySessionSupplier
                 .setClientCapabilities(context.getClientCapabilities())
                 .setTraceToken(context.getTraceToken())
                 .setResourceEstimates(context.getResourceEstimates())
-                .setProtocolHeaders(context.getProtocolHeaders());
+                .setProtocolHeaders(context.getProtocolHeaders())
+                .setQueryDataEncoding(context.getQueryDataEncodingId());
+
+        if (context.getQueryDataEncodingId().isPresent() && spoolingEncryptionEnabled) {
+            sessionBuilder.setQueryDataEncryptionKey(serializeAesEncryptionKey(createRandomAesEncryptionKey()));
+        }
 
         if (context.getCatalog().isPresent()) {
             sessionBuilder.setCatalog(context.getCatalog());

@@ -26,6 +26,7 @@ import io.trino.metadata.Metadata;
 import io.trino.metadata.SessionPropertyManager;
 import io.trino.security.AllowAllAccessControl;
 import io.trino.server.protocol.PreparedStatementEncoder;
+import io.trino.server.protocol.spooling.SpoolingConfig;
 import io.trino.spi.QueryId;
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.CatalogSchemaName;
@@ -72,7 +73,8 @@ public class TestQuerySessionSupplier
             createTestMetadataManager(),
             ImmutableSet::of,
             new AllowAllAccessControl(),
-            new ProtocolConfig());
+            new ProtocolConfig(),
+            _ -> Optional.empty());
 
     @Test
     public void testCreateSession()
@@ -246,6 +248,7 @@ public class TestQuerySessionSupplier
                 metadata,
                 new AllowAllAccessControl(),
                 new SessionPropertyManager(),
-                config);
+                config,
+                new SpoolingConfig());
     }
 }

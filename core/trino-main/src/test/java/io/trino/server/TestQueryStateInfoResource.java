@@ -14,12 +14,19 @@
 package io.trino.server;
 
 import com.google.common.io.Closer;
+import com.google.inject.Injector;
+import com.google.inject.Key;
+import com.google.inject.TypeLiteral;
+import io.airlift.bootstrap.Bootstrap;
 import io.airlift.http.client.HttpClient;
 import io.airlift.http.client.Request;
 import io.airlift.http.client.UnexpectedResponseException;
 import io.airlift.http.client.jetty.JettyHttpClient;
 import io.airlift.json.JsonCodec;
+import io.airlift.json.JsonModule;
 import io.airlift.units.Duration;
+import io.opentelemetry.api.OpenTelemetry;
+import io.opentelemetry.api.trace.Tracer;
 import io.trino.client.QueryResults;
 import io.trino.plugin.tpch.TpchPlugin;
 import io.trino.server.testing.TestingTrinoServer;
@@ -41,6 +48,9 @@ import static io.airlift.http.client.Request.Builder.preparePost;
 import static io.airlift.http.client.StaticBodyGenerator.createStaticBodyGenerator;
 import static io.airlift.json.JsonCodec.jsonCodec;
 import static io.airlift.json.JsonCodec.listJsonCodec;
+import static io.airlift.json.JsonCodecBinder.jsonCodecBinder;
+import static io.airlift.tracing.Tracing.noopTracer;
+import static io.opentelemetry.api.OpenTelemetry.noop;
 import static io.trino.client.ProtocolHeaders.TRINO_HEADERS;
 import static io.trino.execution.QueryState.FAILED;
 import static io.trino.execution.QueryState.RUNNING;
@@ -60,7 +70,7 @@ import static org.junit.jupiter.api.parallel.ExecutionMode.CONCURRENT;
 public class TestQueryStateInfoResource
 {
     private static final String LONG_LASTING_QUERY = "SELECT * FROM tpch.sf1.lineitem";
-    private static final JsonCodec<QueryResults> QUERY_RESULTS_JSON_CODEC = jsonCodec(QueryResults.class);
+    private static final JsonCodec<QueryResults> QUERY_RESULTS_JSON_CODEC = queryResultsCodec();
 
     private TestingTrinoServer server;
     private HttpClient client;
@@ -87,7 +97,7 @@ public class TestQueryStateInfoResource
                 .setBodyGenerator(createStaticBodyGenerator(LONG_LASTING_QUERY, UTF_8))
                 .setHeader(TRINO_HEADERS.requestUser(), "user2")
                 .build();
-        QueryResults queryResults2 = client.execute(request2, createJsonResponseHandler(jsonCodec(QueryResults.class)));
+        QueryResults queryResults2 = client.execute(request2, createJsonResponseHandler(QUERY_RESULTS_JSON_CODEC));
         client.execute(prepareGet().setUri(queryResults2.getNextUri()).build(), createJsonResponseHandler(QUERY_RESULTS_JSON_CODEC));
 
         // queries are started in the background, so they may not all be immediately visible
@@ -242,5 +252,19 @@ public class TestQueryStateInfoResource
                 createJsonResponseHandler(jsonCodec(QueryStateInfo.class))))
                 .isInstanceOf(UnexpectedResponseException.class)
                 .hasMessageMatching("Expected response code .*, but was 404");
+    }
+
+    public static JsonCodec<QueryResults> queryResultsCodec()
+    {
+        Injector injector = new Bootstrap(
+                new JsonModule(),
+                binder -> {
+                    jsonCodecBinder(binder).bindJsonCodec(QueryResults.class);
+                    binder.bind(OpenTelemetry.class).toInstance(noop());
+                    binder.bind(Tracer.class).toInstance(noopTracer());
+                }
+        ).initialize();
+
+        return injector.getInstance(Key.get(new TypeLiteral<>(){}));
     }
 }
