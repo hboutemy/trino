@@ -18,7 +18,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import io.airlift.json.ObjectMapperProvider;
 import io.airlift.units.Duration;
-import io.trino.plugin.deltalake.transactionlog.writer.S3NativeTransactionLogSynchronizer;
+import io.trino.plugin.deltalake.transactionlog.writer.S3TransactionLogSynchronizer;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
@@ -58,6 +58,7 @@ public class TestDeltaLakeMinioAndHmsConnectorSmokeTest
                 .put("s3.region", MINIO_REGION)
                 .put("s3.endpoint", hiveMinioDataLake.getMinio().getMinioAddress())
                 .put("s3.path-style-access", "true")
+                .put("s3.exclusive-create", "false") // disable so we can test our own locking scheme
                 .put("s3.max-connections", "2")
                 .buildOrThrow();
     }
@@ -75,6 +76,7 @@ public class TestDeltaLakeMinioAndHmsConnectorSmokeTest
                 .put("s3.path-style-access", "true")
                 .put("s3.streaming.part-size", "5MB") // minimize memory usage
                 .put("s3.max-connections", "4") // verify no leaks
+                .put("s3.exclusive-create", "false") // disable so we can test our own locking scheme
                 .put("delta.enable-non-concurrent-writes", "true")
                 .buildOrThrow();
     }
@@ -273,7 +275,7 @@ public class TestDeltaLakeMinioAndHmsConnectorSmokeTest
     {
         String lockFilePath = format("%s/00000000000000000001.json.sb-lock_blah", getLockFileDirectory(tableName));
         String lockFileContents = OBJECT_MAPPER.writeValueAsString(
-                new S3NativeTransactionLogSynchronizer.LockFileContents("some_cluster", "some_query", Instant.now().plus(lockDuration).toEpochMilli()));
+                new S3TransactionLogSynchronizer.LockFileContents("some_cluster", "some_query", Instant.now().plus(lockDuration).toEpochMilli()));
         hiveMinioDataLake.writeFile(lockFileContents.getBytes(UTF_8), lockFilePath);
         String lockUri = format("s3://%s/%s", bucketName, lockFilePath);
         assertThat(listLocks(tableName)).containsExactly(lockUri); // sanity check

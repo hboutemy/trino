@@ -127,6 +127,7 @@ public final class DeltaLakeQueryRunner
                     .put("s3.endpoint", minio.getMinioAddress())
                     .put("s3.path-style-access", "true")
                     .put("s3.streaming.part-size", "5MB") // minimize memory usage
+                    .put("s3.exclusive-create", "true")
                     .buildOrThrow());
             setSchemaLocation("s3://%s/%s".formatted(bucketName, schemaName));
             return this;

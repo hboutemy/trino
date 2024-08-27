@@ -18,7 +18,7 @@ import com.google.inject.Module;
 import com.google.inject.Scopes;
 import io.trino.plugin.deltalake.transactionlog.writer.AzureTransactionLogSynchronizer;
 import io.trino.plugin.deltalake.transactionlog.writer.GcsTransactionLogSynchronizer;
-import io.trino.plugin.deltalake.transactionlog.writer.S3NativeTransactionLogSynchronizer;
+import io.trino.plugin.deltalake.transactionlog.writer.S3TransactionLogSynchronizer;
 import io.trino.plugin.deltalake.transactionlog.writer.TransactionLogSynchronizer;
 
 import static com.google.inject.multibindings.MapBinder.newMapBinder;
@@ -40,9 +40,9 @@ public class DeltaLakeSynchronizerModule
         synchronizerBinder.addBinding("gs").to(GcsTransactionLogSynchronizer.class).in(Scopes.SINGLETON);
 
         // S3
-        jsonCodecBinder(binder).bindJsonCodec(S3NativeTransactionLogSynchronizer.LockFileContents.class);
-        synchronizerBinder.addBinding("s3").to(S3NativeTransactionLogSynchronizer.class).in(Scopes.SINGLETON);
-        synchronizerBinder.addBinding("s3a").to(S3NativeTransactionLogSynchronizer.class).in(Scopes.SINGLETON);
-        synchronizerBinder.addBinding("s3n").to(S3NativeTransactionLogSynchronizer.class).in(Scopes.SINGLETON);
+        jsonCodecBinder(binder).bindJsonCodec(S3TransactionLogSynchronizer.LockFileContents.class);
+        synchronizerBinder.addBinding("s3").to(S3TransactionLogSynchronizer.class).in(Scopes.SINGLETON);
+        synchronizerBinder.addBinding("s3a").to(S3TransactionLogSynchronizer.class).in(Scopes.SINGLETON);
+        synchronizerBinder.addBinding("s3n").to(S3TransactionLogSynchronizer.class).in(Scopes.SINGLETON);
     }
 }

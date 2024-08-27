@@ -26,6 +26,7 @@ import io.trino.filesystem.TrinoFileSystem;
 import io.trino.filesystem.TrinoFileSystemFactory;
 import io.trino.filesystem.TrinoInputFile;
 import io.trino.filesystem.TrinoOutputFile;
+import io.trino.filesystem.s3.S3FileSystemConfig;
 import io.trino.spi.connector.ConnectorSession;
 
 import java.io.FileNotFoundException;
@@ -33,6 +34,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
+import java.nio.file.FileAlreadyExistsException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
@@ -48,10 +50,10 @@ import static java.util.Objects.requireNonNull;
 /**
  * The S3 Native synchronizer is a {@link TransactionLogSynchronizer} for S3 that requires no other dependencies.
  */
-public class S3NativeTransactionLogSynchronizer
+public class S3TransactionLogSynchronizer
         implements TransactionLogSynchronizer
 {
-    public static final Logger LOG = Logger.get(S3NativeTransactionLogSynchronizer.class);
+    public static final Logger LOG = Logger.get(S3TransactionLogSynchronizer.class);
 
     // TODO: add refreshing of log expiration time (https://github.com/trinodb/trino/issues/12008)
     private static final Duration EXPIRATION_DURATION = Duration.of(5, MINUTES);
@@ -61,22 +63,53 @@ public class S3NativeTransactionLogSynchronizer
 
     private final TrinoFileSystemFactory fileSystemFactory;
     private final JsonCodec<LockFileContents> lockFileContentsJsonCodec;
+    private boolean exclusiveCreateSupported;
 
     @Inject
-    public S3NativeTransactionLogSynchronizer(TrinoFileSystemFactory fileSystemFactory, JsonCodec<LockFileContents> lockFileContentesCodec)
+    public S3TransactionLogSynchronizer(TrinoFileSystemFactory fileSystemFactory, JsonCodec<LockFileContents> lockFileContentesCodec)
     {
         this.fileSystemFactory = requireNonNull(fileSystemFactory, "fileSystemFactory is null");
         this.lockFileContentsJsonCodec = requireNonNull(lockFileContentesCodec, "lockFileContentesCodec is null");
     }
 
+    @Inject(optional = true)
+    public void setS3FileSystemConfig(S3FileSystemConfig s3FileSystemConfig)
+    {
+        exclusiveCreateSupported = s3FileSystemConfig.isSupportsExclusiveCreate();
+    }
+
     @Override
     public boolean isUnsafe()
     {
-        return true;
+        return !exclusiveCreateSupported;
     }
 
     @Override
     public void write(ConnectorSession session, String clusterId, Location newLogEntryPath, byte[] entryContents)
+    {
+        if (exclusiveCreateSupported) {
+            writeExclusive(session, clusterId, newLogEntryPath, entryContents);
+        }
+        else {
+            writeNative(session, clusterId, newLogEntryPath, entryContents);
+        }
+    }
+
+    private void writeExclusive(ConnectorSession session, String ignored, Location newLogEntryPath, byte[] entryContents)
+    {
+        TrinoFileSystem fileSystem = fileSystemFactory.create(session);
+        try {
+            fileSystem.newOutputFile(newLogEntryPath).createExclusive(entryContents);
+        }
+        catch (FileAlreadyExistsException e) {
+            throw new TransactionConflictException("Conflict detected while writing Transaction Log entry " + newLogEntryPath + " to S3", e);
+        }
+        catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    private void writeNative(ConnectorSession session, String clusterId, Location newLogEntryPath, byte[] entryContents)
     {
         TrinoFileSystem fileSystem = fileSystemFactory.create(session);
         Location locksDirectory = newLogEntryPath.sibling(LOCK_DIRECTORY);
