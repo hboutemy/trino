@@ -66,10 +66,10 @@ public class S3TransactionLogSynchronizer
     private boolean exclusiveCreateSupported;
 
     @Inject
-    public S3TransactionLogSynchronizer(TrinoFileSystemFactory fileSystemFactory, JsonCodec<LockFileContents> lockFileContentesCodec)
+    public S3TransactionLogSynchronizer(TrinoFileSystemFactory fileSystemFactory, JsonCodec<LockFileContents> lockFileContentsJsonCodec)
     {
         this.fileSystemFactory = requireNonNull(fileSystemFactory, "fileSystemFactory is null");
-        this.lockFileContentsJsonCodec = requireNonNull(lockFileContentesCodec, "lockFileContentesCodec is null");
+        this.lockFileContentsJsonCodec = requireNonNull(lockFileContentsJsonCodec, "lockFileContentsJsonCodec is null");
     }
 
     @Inject(optional = true)
